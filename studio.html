@@ -11,13 +11,88 @@
 <body class="bg-slate-900 min-h-screen p-6 md:p-12 text-slate-100 flex flex-col items-center">
     <header class="w-full max-w-4xl flex justify-between items-center mb-12">
         <h1 class="text-3xl font-black tracking-tighter">STUDIO <span class="text-blue-500 text-sm ml-2">ADMIN</span></h1>
-        <a href="index.html" class="text-slate-400 hover:text-white font-bold">← 返回學習空間</a>
+        <a href="index.html" class="text-slate-400 hover:text-white font-bold text-sm">← 返回學習空間</a>
     </header>
     
     <main class="w-full max-w-4xl bg-white text-slate-800 p-8 md:p-12 rounded-[3rem] shadow-2xl">
-        </main>
+        <div class="mb-10 p-6 bg-slate-50 rounded-3xl border border-slate-100">
+            <h2 class="text-sm font-black text-slate-400 uppercase tracking-widest mb-4">雲端同步設定</h2>
+            <div class="flex gap-4">
+                <input type="password" id="sync-key" class="flex-1 p-4 bg-white border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold" placeholder="輸入同步金鑰連線...">
+                <button onclick="initSync()" class="bg-blue-600 text-white px-8 py-4 rounded-2xl font-black hover:bg-blue-700 transition">連線</button>
+            </div>
+            <p id="sync-status" class="mt-4 text-xs font-bold text-slate-400 italic">尚未連線</p>
+        </div>
+
+        <div id="editor-zone" class="space-y-6">
+            <h2 class="text-sm font-black text-slate-400 uppercase tracking-widest">新增題組內容</h2>
+            <input type="text" id="new-quiz-name" class="w-full p-5 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold" placeholder="題庫名稱...">
+            <textarea id="import-input" class="w-full h-80 p-6 bg-slate-50 border border-slate-200 rounded-2xl font-mono text-sm outline-none focus:ring-2 focus:ring-blue-500 resize-none" placeholder="貼上包含【文本】、題目、答案與解析的內容..."></textarea>
+            <button onclick="handleImport()" class="w-full bg-slate-900 text-white py-5 rounded-2xl font-black text-xl hover:bg-black transition-all">儲存並同步至雲端</button>
+        </div>
+
+        <div class="mt-12 border-t border-slate-100 pt-10">
+            <h2 class="text-sm font-black text-slate-400 uppercase tracking-widest mb-6">目前雲端題組清單</h2>
+            <div id="quiz-list" class="space-y-3"></div>
+        </div>
+    </main>
+
+    <script>
+        const firebaseConfig = { apiKey: "AIzaSyD719pOpRDq9gfn8MpRsKILmYY8d0y-3n4", authDomain: "learning-41290.firebaseapp.com", projectId: "learning-41290", storageBucket: "learning-41290.firebasestorage.app", messagingSenderId: "451785140537", appId: "1:451785140537:web:668bc05ffa6fe68a51e0e8" };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        
+        let allQuizzes = [], syncKey = localStorage.getItem('master_sync_key') || '';
+        if(syncKey) { document.getElementById('sync-key').value = syncKey; initSync(); }
+
+        async function initSync() {
+            const key = document.getElementById('sync-key').value.trim();
+            if (!key) return; syncKey = key; localStorage.setItem('master_sync_key', key);
+            db.collection("users").doc(syncKey).onSnapshot((doc) => {
+                if (doc.exists) { allQuizzes = doc.data().quizzes || []; document.getElementById('sync-status').innerText = "✅ 已成功連線至「" + syncKey + "」"; renderList(); }
+                else { db.collection("users").doc(syncKey).set({ quizzes: [] }); document.getElementById('sync-status').innerText = "🆕 已建立全新雲端空間"; }
+            });
+        }
+
+        function renderList() {
+            const list = document.getElementById('quiz-list'); list.innerHTML = '';
+            allQuizzes.forEach((q, idx) => {
+                const item = document.createElement('div');
+                item.className = "p-4 bg-slate-50 rounded-2xl flex justify-between items-center border border-slate-100 font-bold text-slate-700";
+                item.innerHTML = `<span>${q.name}</span><button onclick="deleteQuiz(${idx})" class="text-rose-500 hover:text-rose-700">刪除</button>`;
+                list.appendChild(item);
+            });
+        }
+
+        async function handleImport() {
+            const name = document.getElementById('new-quiz-name').value || `題組 ${new Date().toLocaleDateString()}`;
+            const parsed = smartParse(document.getElementById('import-input').value);
+            if (!syncKey) return alert("請先輸入金鑰並連線！");
+            if (parsed.length === 0) return alert("解析失敗，請確認格式。");
+            allQuizzes.push({ name, data: parsed });
+            await db.collection("users").doc(syncKey).set({ quizzes: allQuizzes });
+            alert("題組已成功同步！");
+            document.getElementById('new-quiz-name').value = ''; document.getElementById('import-input').value = '';
+        }
+
+        async function deleteQuiz(idx) { if(confirm("確定刪除此雲端題組？")) { allQuizzes.splice(idx, 1); await db.collection("users").doc(syncKey).set({ quizzes: allQuizzes }); } }
+
+        function smartParse(text) {
+            const lines = text.split('\n'); let questions = [], activePassage = "", currentQ = null, currentMode = "";
+            lines.forEach(line => {
+                const l = line.trim();
+                if (!l && currentMode !== "PASSAGE" && currentMode !== "RATIONALE") return;
+                if (l.includes('【文本】')) { currentMode = "PASSAGE"; activePassage = line.replace('【文本】', '').trim(); return; }
+                if (l.match(/^(Q\d+|[0-9]+)[\.\:：]/)) { currentMode = "QUESTION"; if (currentQ) questions.push(currentQ); currentQ = { passage: activePassage, q: l, options: [], ans: 0, rationale: "" }; return; }
+                if (l.match(/^答案[:：]/)) { currentMode = "ANSWER"; const ans = l.match(/[A-D]/i); if (currentQ && ans) currentQ.ans = ans[0].toUpperCase().charCodeAt(0) - 65; return; }
+                if (l.match(/^解析[:：]/)) { currentMode = "RATIONALE"; if (currentQ) currentQ.rationale = l.replace(/^解析[:：]/, '').trim(); return; }
+                if (currentMode !== "RATIONALE" && l.match(/^\([A-D]\)/)) { currentMode = "OPTIONS"; const opts = l.match(/\([A-D]\)[^(\n]+/g).map(o => o.replace(/\([A-D]\)/, '').trim()); if (currentQ) currentQ.options.push(...opts); return; }
+                if (currentMode === "PASSAGE") activePassage += (activePassage ? "\n" : "") + line;
+                else if (currentMode === "QUESTION" && currentQ) currentQ.q += "\n" + line;
+                else if (currentMode === "RATIONALE" && currentQ) currentQ.rationale += (currentQ.rationale ? "\n" : "") + line;
+            });
+            if (currentQ) questions.push(currentQ); return questions;
+        }
+    </script>
 </body>
-<script>
-    // 貼上 Firebase Config 與匯入/刪除邏輯 (handleImport, deleteQuiz...)
-</script>
 </html>
