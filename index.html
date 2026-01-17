@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Study Master Studio v3.0</title>
+    <title>Study Master Studio v3.1</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
@@ -12,17 +12,16 @@
         .tab-active { color: #3b82f6; border-bottom: 3px solid #3b82f6; }
         .custom-scroll::-webkit-scrollbar { width: 5px; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
-        textarea { scrollbar-width: thin; scrollbar-color: #334155 transparent; }
     </style>
 </head>
-<body class="flex flex-col font-sans">
+<body class="flex flex-col font-sans" onload="switchTab('manual')">
 
     <header class="h-20 bg-slate-900 border-b border-slate-800 px-8 flex justify-between items-center z-50">
         <div class="flex items-center gap-6">
-            <h1 class="font-black tracking-tighter text-xl text-blue-500 italic">STUDIO 3.0</h1>
+            <h1 class="font-black tracking-tighter text-xl text-blue-500 italic">STUDIO 3.1</h1>
             <nav class="flex gap-8 ml-4">
-                <button onclick="switchTab('ai')" id="tab-ai" class="tab-active py-2 text-sm font-black uppercase tracking-widest transition-all">AI 命題工作室</button>
-                <button onclick="switchTab('manual')" id="tab-manual" class="py-2 text-sm font-black uppercase tracking-widest text-slate-500 transition-all hover:text-slate-300">手動題本管理</button>
+                <button onclick="switchTab('manual')" id="tab-manual" class="py-2 text-sm font-black uppercase tracking-widest transition-all">手動題本管理</button>
+                <button onclick="switchTab('ai')" id="tab-ai" class="py-2 text-sm font-black uppercase tracking-widest text-slate-500 transition-all hover:text-slate-300">AI 命題工作室</button>
             </nav>
         </div>
         
@@ -37,11 +36,42 @@
 
     <main class="flex-1 overflow-hidden relative">
         
-        <div id="view-ai" class="absolute inset-0 flex">
+        <div id="view-manual" class="absolute inset-0 flex flex-col p-12 overflow-y-auto custom-scroll">
+            <div class="max-w-5xl w-full mx-auto">
+                <div class="flex justify-between items-end mb-10">
+                    <div class="flex-1">
+                        <h2 class="text-sm font-black text-blue-500 uppercase tracking-[0.3em] mb-4">Manual Notebook Manager</h2>
+                        <input type="text" id="manual-quiz-name" class="w-full bg-transparent text-5xl font-black border-none outline-none placeholder-slate-800" placeholder="輸入題本名稱 (例：1979 冷戰轉折考點)">
+                    </div>
+                    <div class="bg-slate-800 px-6 py-2 rounded-full text-[10px] font-bold text-slate-400 uppercase tracking-widest border border-white/5">
+                        手動模式：貼入即解析
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div class="lg:col-span-2">
+                        <textarea id="manual-input" class="w-full h-[550px] bg-slate-800/30 border border-slate-800 rounded-[2.5rem] p-8 font-mono text-sm leading-relaxed text-slate-300 outline-none focus:border-blue-500 transition" placeholder="在此貼入已整理好的題本...&#10;&#10;Q1. 關於 1979 年蘇聯入侵阿富汗的敘述，下列何者正確？&#10;(A) 導致蘇聯國力衰退 (B) 促進了華約的團結 (C) 美國表示全力支持 (D) 戰爭在三個月內結束&#10;答案：A&#10;解析：此戰爭被稱為蘇聯的「出血傷口」，加速了蘇聯解體。"></textarea>
+                    </div>
+                    <div class="flex flex-col gap-6">
+                        <div class="bg-slate-800/50 rounded-3xl p-8 border border-white/5 shadow-xl">
+                            <h4 class="text-xs font-black text-slate-400 uppercase mb-4 tracking-widest">操作說明</h4>
+                            <p class="text-xs leading-relaxed text-slate-500 mb-6 italic">
+                                支援 NotebookLM 產出的題目格式。解析後的題本將直接同步至你的學習空間與雲端資料庫。
+                            </p>
+                            <button onclick="syncToQuiz('manual')" class="w-full bg-slate-100 text-slate-900 py-5 rounded-2xl font-black text-lg hover:bg-white transition-all active:scale-95 shadow-2xl">
+                                儲存並同步至雲端
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="view-ai" class="absolute inset-0 hidden flex">
             <aside class="w-72 bg-slate-900/50 border-r border-slate-800 p-6 flex flex-col">
-                <h2 class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-6">AI Notebooks</h2>
+                <h2 class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-6">Source Materials</h2>
                 <div id="note-list" class="flex-1 space-y-2 overflow-y-auto custom-scroll pr-2"></div>
-                <button onclick="createNewNote()" class="w-full mt-4 py-3 bg-slate-800 rounded-xl text-xs font-bold hover:bg-slate-700 transition">+ 新增素材</button>
+                <button onclick="createNewNote()" class="w-full mt-4 py-3 bg-slate-800 rounded-xl text-xs font-bold hover:bg-slate-700 transition">+ 新增素材筆記</button>
                 
                 <div class="mt-8 pt-6 border-t border-slate-800">
                     <label class="text-[9px] font-black text-slate-500 uppercase block mb-2">Gemini API Key</label>
@@ -51,75 +81,44 @@
 
             <section class="flex-1 overflow-y-auto custom-scroll p-12">
                 <div id="ai-editor" class="hidden max-w-4xl mx-auto">
-                    <input type="text" id="note-title" class="bg-transparent text-5xl font-black border-none outline-none mb-8 w-full placeholder-slate-800" placeholder="素材標題">
-                    <textarea id="note-content" class="w-full min-h-[300px] bg-transparent text-xl leading-relaxed text-slate-300 outline-none resize-none mb-10 font-serif" placeholder="在此貼上雜誌、歷史或公民素材..."></textarea>
+                    <div class="flex justify-between items-center mb-8">
+                        <input type="text" id="note-title" class="bg-transparent text-5xl font-black border-none outline-none flex-1 placeholder-slate-800" placeholder="素材標題">
+                        <button onclick="saveNote()" class="bg-slate-800 hover:bg-slate-700 px-6 py-2 rounded-xl text-xs font-bold transition">暫存素材</button>
+                    </div>
+                    <textarea id="note-content" class="w-full min-h-[300px] bg-transparent text-xl leading-relaxed text-slate-300 outline-none resize-none mb-10 font-serif" placeholder="貼上欲命題的文本（如雜誌內容或歷史講義）..."></textarea>
                     
-                    <div class="bg-slate-800/80 rounded-[3rem] p-10 border border-white/5 shadow-2xl">
+                    <div class="bg-blue-900/20 rounded-[3rem] p-10 border border-blue-500/20 shadow-2xl">
                         <div class="flex justify-between items-center mb-8">
-                            <h3 class="text-xl font-bold italic">AI 命題控制台</h3>
+                            <h3 class="text-xl font-bold italic text-blue-400">⚡ AI 智能命題</h3>
                             <select id="model-select" class="bg-slate-900 text-xs p-2 rounded-lg border-none outline-none text-blue-400">
-                                <option value="gemini-1.5-flash">Gemini 1.5 Flash (快速)</option>
-                                <option value="gemini-1.5-pro">Gemini 1.5 Pro (深度推理)</option>
+                                <option value="gemini-1.5-flash">Gemini 1.5 Flash (快速推薦)</option>
+                                <option value="gemini-1.5-pro">Gemini 1.5 Pro (深度解析)</option>
                             </select>
                         </div>
-                        <button onclick="generateQuiz()" class="w-full bg-blue-600 hover:bg-blue-500 py-6 rounded-2xl font-black text-xl shadow-xl transition-all active:scale-95">一鍵生成題組</button>
+                        <button onclick="generateQuiz()" class="w-full bg-blue-600 hover:bg-blue-500 py-6 rounded-2xl font-black text-xl shadow-xl transition-all active:scale-95">
+                            根據素材生成 5 題 (一中/學測難度)
+                        </button>
                     </div>
 
                     <div id="ai-result-area" class="mt-12 hidden">
-                        <div class="flex justify-between items-center mb-4 text-[10px] font-black text-slate-500 uppercase">AI Output Preview</div>
-                        <textarea id="ai-output" class="w-full h-80 p-8 bg-black/50 rounded-[2rem] border border-slate-800 text-slate-300 font-mono text-xs leading-relaxed outline-none mb-4"></textarea>
-                        <button onclick="syncToQuiz('ai')" class="w-full bg-emerald-600 py-4 rounded-xl font-black hover:bg-emerald-500 transition">確認同步至學習空間</button>
+                        <textarea id="ai-output" class="w-full h-80 p-8 bg-black/50 rounded-[2rem] border border-slate-800 text-slate-300 font-mono text-xs outline-none mb-4"></textarea>
+                        <button onclick="syncToQuiz('ai')" class="w-full bg-emerald-600 py-4 rounded-xl font-black hover:bg-emerald-500 transition shadow-lg">確認並發送題本</button>
                     </div>
                 </div>
                 <div id="ai-empty" class="h-full flex flex-col items-center justify-center text-slate-800">
-                    <p class="text-9xl mb-4 opacity-20">🤖</p>
-                    <p class="font-black italic text-xl uppercase">選擇素材開始 AI 命題</p>
+                    <p class="text-9xl mb-4 opacity-10">🪄</p>
+                    <p class="font-black italic text-xl uppercase tracking-widest">請從左側選擇素材開始 AI 命題</p>
                 </div>
             </section>
-        </div>
-
-        <div id="view-manual" class="absolute inset-0 hidden flex flex-col p-12 overflow-y-auto custom-scroll">
-            <div class="max-w-5xl w-full mx-auto">
-                <div class="flex justify-between items-end mb-10">
-                    <div class="flex-1">
-                        <h2 class="text-sm font-black text-blue-500 uppercase tracking-[0.3em] mb-4">Manual Import</h2>
-                        <input type="text" id="manual-quiz-name" class="w-full bg-transparent text-5xl font-black border-none outline-none placeholder-slate-800" placeholder="題本名稱 (如：1979歷史複習)">
-                    </div>
-                    <div class="bg-slate-800 px-6 py-2 rounded-full text-[10px] font-bold text-slate-400 uppercase tracking-widest border border-white/5">
-                        手動模式：支援【文本】格式
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    <div class="lg:col-span-2">
-                        <textarea id="manual-input" class="w-full h-[600px] bg-slate-800/30 border border-slate-800 rounded-[2.5rem] p-8 font-mono text-sm leading-relaxed text-slate-300 outline-none focus:border-blue-500 transition shadow-inner" placeholder="貼上你寫好的題本內容...&#10;&#10;【文本】(可選)&#10;Q1. 題目&#10;(A) 選項 (B) 選項 (C) 選項 (D) 選項&#10;答案：A&#10;解析：..."></textarea>
-                    </div>
-                    <div class="flex flex-col gap-6">
-                        <div class="bg-slate-800/50 rounded-3xl p-8 border border-white/5">
-                            <h4 class="text-xs font-black text-slate-400 uppercase mb-4 tracking-widest">操作指南</h4>
-                            <p class="text-xs leading-relaxed text-slate-500 mb-6">
-                                這個介面專門用來處理你已經整理好的題目。點擊下方按鈕後，系統會自動解析並同步至雲端資料庫。
-                            </p>
-                            <button onclick="syncToQuiz('manual')" class="w-full bg-slate-100 text-slate-900 py-5 rounded-2xl font-black text-lg hover:bg-white transition-all shadow-xl active:scale-95">
-                                儲存並發送題本
-                            </button>
-                        </div>
-                        <div id="manual-status" class="flex-1 bg-black/30 rounded-3xl p-6 border border-slate-800 font-mono text-[10px] text-slate-500">
-                            等待輸入...
-                        </div>
-                    </div>
-                </div>
-            </div>
         </div>
     </main>
 
     <div id="loader" class="fixed inset-0 bg-slate-950/90 backdrop-blur-xl z-[100] hidden flex-col items-center justify-center text-white">
         <div class="w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin mb-6"></div>
-        <p class="font-black text-xl tracking-tighter">處理中，請稍候...</p>
+        <p class="font-black text-xl tracking-tighter uppercase">Processing Data...</p>
     </div>
 
     <script>
-        // Firebase 與全域變數
         const firebaseConfig = { apiKey: "AIzaSyD719pOpRDq9gfn8MpRsKILmYY8d0y-3n4", authDomain: "learning-41290.firebaseapp.com", projectId: "learning-41290", storageBucket: "learning-41290.firebasestorage.app", messagingSenderId: "451785140537", appId: "1:451785140537:web:668bc05ffa6fe68a51e0e8" };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
@@ -130,7 +129,6 @@
         if(syncKey) { document.getElementById('sync-key').value = syncKey; initSync(); }
         if(geminiKey) document.getElementById('gemini-key').value = geminiKey;
 
-        // --- 功能切換 ---
         function switchTab(mode) {
             document.getElementById('view-ai').classList.toggle('hidden', mode !== 'ai');
             document.getElementById('view-manual').classList.toggle('hidden', mode !== 'manual');
@@ -138,28 +136,21 @@
             document.getElementById('tab-manual').className = mode === 'manual' ? 'tab-active py-2 text-sm font-black uppercase tracking-widest transition-all' : 'py-2 text-sm font-black uppercase tracking-widest text-slate-500 transition-all hover:text-slate-300';
         }
 
-        // --- 同步與筆記管理 ---
         async function initSync() {
             const key = document.getElementById('sync-key').value.trim();
             if(!key) return; syncKey = key; localStorage.setItem('master_sync_key', key);
             db.collection("users").doc(syncKey).onSnapshot(doc => {
-                if(doc.exists) { 
-                    notebooks = doc.data().notebooks || []; 
-                    quizzes = doc.data().quizzes || []; 
-                    renderNoteList(); 
-                } else {
-                    db.collection("users").doc(syncKey).set({ notebooks: [], quizzes: [] });
-                }
+                if(doc.exists) { notebooks = doc.data().notebooks || []; quizzes = doc.data().quizzes || []; renderNoteList(); }
+                else db.collection("users").doc(syncKey).set({ notebooks: [], quizzes: [] });
             });
         }
 
         function saveKey() { geminiKey = document.getElementById('gemini-key').value.trim(); localStorage.setItem('master_gemini_key', geminiKey); }
-
         function renderNoteList() {
             const list = document.getElementById('note-list'); list.innerHTML = '';
             notebooks.forEach((n, idx) => {
                 const card = document.createElement('div');
-                card.className = `p-3 rounded-lg cursor-pointer transition text-[11px] font-bold uppercase tracking-tighter ${currentNoteIndex === idx ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`;
+                card.className = `p-3 rounded-lg cursor-pointer transition text-[11px] font-bold uppercase ${currentNoteIndex === idx ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`;
                 card.innerHTML = n.title || 'Untitled';
                 card.onclick = () => loadNote(idx);
                 list.appendChild(card);
@@ -182,31 +173,29 @@
             notebooks[currentNoteIndex].title = document.getElementById('note-title').value;
             notebooks[currentNoteIndex].content = document.getElementById('note-content').value;
             await db.collection("users").doc(syncKey).update({ notebooks });
-            alert("素材已儲存並同步");
+            alert("素材筆記已存檔");
         }
 
-        // --- AI 命題 ---
         async function generateQuiz() {
             const content = document.getElementById('note-content').value.trim();
             const model = document.getElementById('model-select').value;
             if(!geminiKey) return alert("請輸入 API Key");
-            if(!content) return alert("內容不可為空");
+            if(!content) return alert("素材內容不可為空");
 
             document.getElementById('loader').classList.replace('hidden', 'flex');
             try {
                 const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ contents: [{ parts: [{ text: "請針對以下素材產出 5 題具思辨性的選擇題：\n" + content + "\n\n格式：Q1.題目\n(A)選 (B)選 (C)選 (D)選\n答案：X\n解析：[詳盡思辨]" }] }] })
+                    body: JSON.stringify({ contents: [{ parts: [{ text: "你是一位台中一中與學測命題專家。請根據素材產出 5 題具備深度思考邏輯的選擇題：\n" + content + "\n\n格式規範：Q1.題目\n(A)選 (B)選 (C)選 (D)選\n答案：X\n解析：[詳盡思辨分析]" }] }] })
                 });
                 const data = await res.json();
                 document.getElementById('ai-output').value = data.candidates[0].content.parts[0].text;
                 document.getElementById('ai-result-area').classList.remove('hidden');
-            } catch (e) { alert("生成失敗"); }
+            } catch (e) { alert("AI 生成出錯"); }
             finally { document.getElementById('loader').classList.replace('flex', 'hidden'); }
         }
 
-        // --- 核心解析與同步 ---
         async function syncToQuiz(type) {
             const text = type === 'ai' ? document.getElementById('ai-output').value : document.getElementById('manual-input').value;
             const name = type === 'ai' ? document.getElementById('note-title').value + " (AI)" : document.getElementById('manual-quiz-name').value;
@@ -215,11 +204,11 @@
             if(!text || !name) return alert("標題或內容不可為空");
 
             const parsed = smartParse(text);
-            if(parsed.length === 0) return alert("解析失敗，請確認格式（需包含 Q1. 等標記）");
+            if(parsed.length === 0) return alert("格式解析失敗");
 
             quizzes.push({ name, data: parsed });
             await db.collection("users").doc(syncKey).update({ quizzes });
-            alert("題本已成功發送至學習空間！");
+            alert("題本已發送至雲端學習空間！");
             if(type === 'manual') { document.getElementById('manual-input').value = ''; document.getElementById('manual-quiz-name').value = ''; }
         }
 
@@ -257,3 +246,5 @@
     </script>
 </body>
 </html>
+</html>
+
