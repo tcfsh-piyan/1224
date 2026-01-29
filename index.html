@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Study Master Studio v3.5 Split</title>
+    <title>Study Master Studio v3.6 Ultimate</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
@@ -20,7 +20,7 @@
 
     <header class="h-20 bg-slate-900 border-b border-slate-800 px-8 flex justify-between items-center z-50">
         <div class="flex items-center gap-6">
-            <h1 class="font-black tracking-tighter text-xl text-blue-500 italic">STUDIO 3.5</h1>
+            <h1 class="font-black tracking-tighter text-xl text-blue-500 italic">STUDIO 3.6</h1>
             <nav class="flex gap-8 ml-4">
                 <button onclick="switchTab('manual')" id="tab-manual" class="py-2 text-sm font-black uppercase tracking-widest transition-all">手動題本管理</button>
                 <button onclick="switchTab('ai')" id="tab-ai" class="py-2 text-sm font-black uppercase tracking-widest text-slate-500 transition-all hover:text-slate-300">AI 命題工作室</button>
@@ -47,7 +47,7 @@
                             <input type="text" id="manual-quiz-name" class="w-full bg-transparent text-5xl font-black border-none outline-none placeholder-slate-800" placeholder="題本標題">
                         </div>
                     </div>
-                    <textarea id="manual-input" class="w-full h-[550px] bg-slate-800/30 border border-slate-800 rounded-[2.5rem] p-8 font-mono text-sm leading-relaxed text-slate-300 outline-none focus:border-blue-500 transition" placeholder="在此輸入題本內容...&#10;&#10;[Tip] 若要分隔不同大題，請使用分隔線：&#10;======"></textarea>
+                    <textarea id="manual-input" class="w-full h-[550px] bg-slate-800/30 border border-slate-800 rounded-[2.5rem] p-8 font-mono text-sm leading-relaxed text-slate-300 outline-none focus:border-blue-500 transition" placeholder="在此輸入題本內容...&#10;&#10;[Text] 區塊內的選項 (A)(B)... 將自動作為下方題目的備選單字。&#10;使用 ====== 分隔大題。"></textarea>
                     
                     <div class="mt-8 flex gap-4">
                         <button onclick="syncToQuiz('manual')" class="flex-1 bg-slate-100 text-slate-900 py-5 rounded-2xl font-black text-lg hover:bg-white transition-all active:scale-95 shadow-2xl">
@@ -62,8 +62,7 @@
                     <h2 class="text-[10px] font-black text-slate-500 uppercase tracking-widest">已完成題本 (雲端)</h2>
                     <span id="quiz-count" class="text-[10px] bg-slate-800 px-2 py-1 rounded text-slate-400">0</span>
                 </div>
-                <div id="quiz-list" class="flex-1 space-y-3 overflow-y-auto custom-scroll pr-2">
-                    </div>
+                <div id="quiz-list" class="flex-1 space-y-3 overflow-y-auto custom-scroll pr-2"></div>
             </aside>
         </div>
 
@@ -119,7 +118,14 @@
     </div>
 
     <script>
-        const firebaseConfig = { apiKey: "AIzaSyD719pOpRDq9gfn8MpRsKILmYY8d0y-3n4", authDomain: "learning-41290.firebaseapp.com", projectId: "learning-41290", storageBucket: "learning-41290.firebasestorage.app", messagingSenderId: "451785140537", appId: "1:451785140537:web:668bc05ffa6fe68a51e0e8" };
+        const firebaseConfig = { 
+            apiKey: "AIzaSyD719pOpRDq9gfn8MpRsKILmYY8d0y-3n4", 
+            authDomain: "learning-41290.firebaseapp.com", 
+            projectId: "learning-41290", 
+            storageBucket: "learning-41290.firebasestorage.app", 
+            messagingSenderId: "451785140537", 
+            appId: "1:451785140537:web:668bc05ffa6fe68a51e0e8" 
+        };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
@@ -181,32 +187,29 @@
             });
         }
 
-        // --- 核心升級：回頭編輯功能 (支援 A-Z 選項還原) ---
         function loadQuizToManual(idx) {
             const quiz = quizzes[idx];
             document.getElementById('manual-quiz-name').value = quiz.name.replace(" (AI)", "");
             
             let textOutput = "";
+            let lastPassage = "";
             quiz.data.forEach((item, i) => {
-                // 如果這題的 passage 跟上一題不同，才顯示 [Text] (避免重複)
-                // 這裡簡化處理：如果 item.passage 存在就顯示
-                if (item.passage) textOutput += `【文本】\n${item.passage}\n\n`;
+                if (item.passage && item.passage !== lastPassage) {
+                    textOutput += `【文本】\n${item.passage}\n\n`;
+                    lastPassage = item.passage;
+                }
                 
                 textOutput += `${item.q}\n`;
-                
                 const labels = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
                 item.options.forEach((opt, j) => {
                     textOutput += `(${labels[j]}) ${opt} `;
                 });
                 
-                textOutput += `\n答案：${labels[item.ans] || '?'}\n解析：${item.rationale}\n\n`;
-                
-                // 視覺分隔，方便編輯
-                textOutput += "======\n\n"; 
+                textOutput += `\n答案：${labels[item.ans] || '?'}\n解析：${item.rationale}\n\n======\n\n`;
             });
 
             document.getElementById('manual-input').value = textOutput.trim();
-            alert(`已載入題本：${quiz.name}，可開始編輯。`);
+            alert(`已載入題本：${quiz.name}`);
         }
 
         async function deleteQuiz(idx) {
@@ -244,7 +247,7 @@
                 const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ contents: [{ parts: [{ text: "你是一位專業命題專家。請根據素材產出 5 題具備深度思考邏輯的選擇題：\n" + content + "\n\n格式規範：Q1.題目\n(A)選 (B)選 (C)選 (D)選\n答案：X\n解析：[詳盡思辨分析]" }] }] })
+                    body: JSON.stringify({ contents: [{ parts: [{ text: "你是一位命題專家。請根據素材產出 5 題具備深度思考邏輯的選擇題：\n" + content + "\n\n格式規範：Q1.題目\n(A)選 (B)選 (C)選 (D)選\n答案：X\n解析：[詳盡分析]" }] }] })
                 });
                 const data = await res.json();
                 document.getElementById('ai-output').value = data.candidates[0].content.parts[0].text;
@@ -264,7 +267,7 @@
 
             const existingIdx = quizzes.findIndex(q => q.name === name);
             if (existingIdx !== -1) {
-                if(confirm("偵測到同名題本，要覆蓋更新嗎？")) {
+                if(confirm("要覆蓋更新現有題本嗎？")) {
                     quizzes[existingIdx].data = parsed;
                 } else {
                     quizzes.push({ name: name + " (Rev)", data: parsed });
@@ -274,71 +277,80 @@
             }
 
             await db.collection("users").doc(syncKey).update({ quizzes });
-            alert("題本已成功發送至雲端學習空間！");
+            alert("同步成功！");
             if(type === 'manual') { document.getElementById('manual-input').value = ''; document.getElementById('manual-quiz-name').value = ''; }
         }
 
-        // --- 核心升級 v3.5：分水嶺與選項隔離 ---
+        // --- 核心邏輯 v3.6：智慧選項繼承 ---
         function smartParse(text) {
             const lines = text.split('\n'); 
             let questions = [], activePassage = "", currentQ = null, mode = "";
-            
+            let activePassageOptions = []; 
+
             lines.forEach(line => {
                 const l = line.trim();
                 
-                // 0. 偵測分水嶺 (====== 或 ------)：強制重置上一題，避免選項跨區干擾
                 if (l.match(/^[-=]{3,}$/)) {
-                    if (currentQ) { questions.push(currentQ); currentQ = null; }
-                    mode = ""; // 重置模式
-                    return; // 跳過這一行
+                    if (currentQ) { 
+                        if (currentQ.options.length === 0) currentQ.options = [...activePassageOptions];
+                        questions.push(currentQ); currentQ = null; 
+                    }
+                    mode = ""; return; 
                 }
 
-                // 1. 偵測文本 (支援 [Text] 或 【文本】)
                 if (l.includes('[Text]') || l.includes('【文本】')) { 
-                    // 如果上一題還沒存，先存起來
-                    if (currentQ) { questions.push(currentQ); currentQ = null; }
+                    if (currentQ) { 
+                        if (currentQ.options.length === 0) currentQ.options = [...activePassageOptions];
+                        questions.push(currentQ); currentQ = null; 
+                    }
                     mode = "PASSAGE"; 
                     activePassage = l.replace(/\[Text\]|【文本】/g, '').trim(); 
+                    activePassageOptions = []; 
                     return; 
                 }
 
-                // 2. 偵測題目 (Q1. 或 1.)
                 if (l.match(/^(Q\d+|[0-9]+)[\.\:：]/)) { 
-                    if (currentQ) questions.push(currentQ); 
+                    if (currentQ) {
+                        if (currentQ.options.length === 0) currentQ.options = [...activePassageOptions];
+                        questions.push(currentQ); 
+                    }
                     currentQ = { passage: activePassage, q: l, options: [], ans: 0, rationale: "" }; 
                     mode = "Q"; return; 
                 }
 
-                // 3. 偵測答案 (支援 Answer: 或 答案：)
                 if (l.match(/^(Answer|答案)[:：]/i)) { 
                     const ans = l.match(/[A-Z]/i); 
                     if (currentQ && ans) currentQ.ans = ans[0].toUpperCase().charCodeAt(0) - 65; 
                     mode = "A"; return; 
                 }
 
-                // 4. 偵測解析
                 if (l.match(/^(Rationale|Analysis|解析)[:：]/i)) { 
                     if (currentQ) currentQ.rationale = l.replace(/^(Rationale|Analysis|解析)[:：]/i, '').trim(); 
                     mode = "R"; return; 
                 }
 
-                // 5. 偵測選項 (關鍵修復：如果是 PASSAGE 模式，禁止偵測選項！)
-                if (mode !== "R" && mode !== "PASSAGE" && l.match(/^\([A-Z]\)/)) { 
+                if (l.match(/^\([A-Z]\)/)) { 
                     const opts = l.match(/\([A-Z]\)[^(\n]+/g);
                     if (opts) {
                         const cleanedOpts = opts.map(o => o.replace(/\([A-Z]\)/, '').trim());
-                        if (currentQ) currentQ.options.push(...cleanedOpts); 
+                        if (mode === "PASSAGE") {
+                            activePassageOptions.push(...cleanedOpts);
+                        } else if (currentQ) {
+                            currentQ.options.push(...cleanedOpts);
+                        }
                     }
-                    return; 
+                    if (mode !== "PASSAGE") return; 
                 }
 
-                // 6. 處理多行內容
-                if (mode === "PASSAGE") activePassage += "\n" + line; // 這裡會把 (A)... 存進文章，因為上面擋住了
+                if (mode === "PASSAGE") activePassage += "\n" + line;
                 else if (mode === "Q" && currentQ) currentQ.q += "\n" + line;
                 else if (mode === "R" && currentQ) currentQ.rationale += "\n" + line;
             });
 
-            if (currentQ) questions.push(currentQ);
+            if (currentQ) {
+                if (currentQ.options.length === 0) currentQ.options = [...activePassageOptions];
+                questions.push(currentQ);
+            }
             return questions;
         }
     </script>
